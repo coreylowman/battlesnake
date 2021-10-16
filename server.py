@@ -24,11 +24,11 @@ def handle_info():
     print("INFO")
     return {
         "apiversion": "1",
-        "author": "",  # TODO: Your Battlesnake Username
-        "color": "#888888",  # TODO: Personalize
-        "head": "default",  # TODO: Personalize
-        "tail": "default",  # TODO: Personalize
-    }
+        "author": "Lowmen",
+        "color": "#00FF00",
+        "head": "default",
+        "tail": "default",
+  }
 
 
 @app.post("/start")

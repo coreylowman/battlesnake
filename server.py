@@ -1,5 +1,6 @@
 import logging
 import os
+import datetime
 
 from flask import Flask
 from flask import request
@@ -26,8 +27,8 @@ def handle_info():
         "apiversion": "1",
         "author": "Lowmen",
         "color": "#00FF00",
-        "head": "default",
-        "tail": "default",
+        "head": "bonhomme",
+        "tail": "bonhomme",
   }
 
 
@@ -64,8 +65,10 @@ def end():
     It's purely for informational purposes, you don't have to make any decisions here.
     """
     data = request.get_json()
+    ct = datetime.datetime.now()
 
-    print(f"{data['game']['id']} END")
+    print(f"{data['game']['id']} END", ct)
+    #print(f"{data['board']['snakes']} END")
     return "ok"
 
 

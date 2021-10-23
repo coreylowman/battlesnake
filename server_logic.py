@@ -1,144 +1,128 @@
-import random
 from typing import List, Dict
 import datetime
-
-# NOTE: up is y + 1
-# NOTE: right is x + 1
-
-
-def distance(a, b):
-    return abs(a["x"] - b["x"]) + abs(a["y"] - b["y"])
+import random
+from objects import Battlesnake, Board, Move, Position
 
 
-def remove_possible_move(move: str, possible_moves: List[str]):
-    if move in possible_moves:
-        possible_moves.remove(move)
+class Strategy:
+    def __init__(self, data: Dict):
+        # load in data
+        self.me = Battlesnake(data["you"])
+        self.board = Board(data["board"])
+
+        self.possible_moves: List[Move] = [Move.UP, Move.DOWN, Move.LEFT, Move.RIGHT]
+        random.shuffle(self.possible_moves)
+        self.other_snakes: List[Battlesnake] = [s for s in self.board.snakes if s != self.me]
+
+        # syntactic sugar for stuff used a lot
+        self.width = self.board.width
+        self.height = self.board.height
+        self.x = self.me.head.x
+        self.y = self.me.head.y
+        self.head = self.me.head
+        self.length = self.me.length
+
+    def _floodfill(self, move: Move) -> int:
+        queue = [self.head.apply(move)]
+        done = set()
+        while len(queue) > 0:
+            position = queue.pop()
+            done.add(position)
+            for move in [Move.RIGHT, Move.LEFT, Move.DOWN, Move.UP]:
+                neighbor = position.apply(move)
+                blocked = any(neighbor in s.body for s in self.board.snakes)
+                on_grid = 0 <= neighbor.x < self.width and 0 <= neighbor.y < self.height
+                if neighbor not in done and neighbor not in queue and not blocked and on_grid:
+                    queue.append(neighbor)
+        return len(done)
 
 
-def avoid_body(head: Dict[str, int], body: List[Dict[str, int]], possible_moves: List[str]):
-    x = head["x"]
-    y = head["y"]
-    for segment in body:
-        if x + 1 == segment["x"] and y == segment["y"]:
-            remove_possible_move("right", possible_moves)
-        elif x - 1 == segment["x"] and y == segment["y"]:
-            remove_possible_move("left", possible_moves)
-        elif x == segment["x"] and y + 1 == segment["y"]:
-            remove_possible_move("up", possible_moves)
-        elif x == segment["x"] and y - 1 == segment["y"]:
-            remove_possible_move("down", possible_moves)
+    def _discard(self, move: Move):
+        if move in self.possible_moves:
+            self.possible_moves.remove(move)
 
-def avoid_head(myhead: Dict[str, int], mylength , snakehead: Dict[str, int], snakelength, possible_moves: List[str]):
-    if mylength > snakelength:
-        return
-    myx = myhead["x"]
-    myy = myhead["y"]
-    snakex = myhead["x"]
-    snakey = myhead["y"]
-    if myx + 2 == snakex and myy == snakey:
-        remove_possible_move("right", possible_moves)
-    elif myx - 2 == snakex and myy == snakey:
-        remove_possible_move("left", possible_moves)
-    elif myx == snakex and myy + 2 == snakey:
-        remove_possible_move("up", possible_moves)
-    elif myx == snakex and myy - 2 == snakey:
-        remove_possible_move("down", possible_moves)
+    def _avoid_edges(self):
+        for move in [Move.RIGHT, Move.LEFT, Move.DOWN, Move.UP]:
+            if self.me.apply(move).is_out_of_bounds(self.width, self.height):
+                self._discard(move)
 
+    def _avoid_positions(self, positions: List[Position]):
+        for move in [Move.RIGHT, Move.LEFT, Move.DOWN, Move.UP]:
+            # if moving this way would intersect with any of the `positions`, don't move this way
+            if self.me.apply(move) in positions:
+                self._discard(move)
 
-def could_die(move, me, other) -> bool:
-    # returns whether or not this move could collide with the `other` snake
-    # if `me` is longer than `other`, this returns False
-    if distance(me["head"], other["head"]) > 2 or me["length"] > other["length"]:
-        return False
-    next_pos = apply_move(me["head"], move)
-    for other_move in ["up", "down", "left", "right"]:
-        if next_pos == apply_move(other["head"], other_move):
-            return True
-    return False
+    def _risk(self, move: Move) -> int:
+        # calculate where we'll be after this move
+        next_pos = self.me.apply(move)
 
+        # a dangerous snake is one that is longer than us and within 1 square of `next_pos`
+        dangerous_snakes = filter(lambda s: s.dist(next_pos) <= 1 and self.length <= s.length, self.other_snakes)
 
-def risk(move, me, snakes) -> int:
-    # risk is the number of other snakes that this move could collide with
-    return sum(could_die(move, me, s) for s in snakes if s["id"] != me["id"])
+        # risk is the number of other snakes that could be at the next position after following `move`
+        return sum(snake.could_move_to(next_pos) for snake in dangerous_snakes)
 
+    def _hazardous(self, move: Move) -> bool:
+        next_pos = self.me.apply(move)
+        return not self._safe(next_pos)
 
-def avoid_edges(my_head: Dict[str, int], width: int, height: int, possible_moves: List[str]):
-    if my_head["x"] + 1 == width:
-        remove_possible_move("right", possible_moves)
-    if my_head["x"] == 0:
-        remove_possible_move("left", possible_moves)
-    if my_head["y"] + 1 == height:
-        remove_possible_move("up", possible_moves)
-    if my_head["y"] == 0:
-        remove_possible_move("down", possible_moves)
+    def _safe(self, p: Position) -> bool:
+        return p not in self.board.hazards
 
+    def _own(self, p: Position) -> bool:
+        return min(self.board.snakes, key=p.dist) == self.me
 
-def apply_move(head, move):
-    if move == "left":
-        return {"x": head["x"] - 1, "y": head["y"]}
-    elif move == "right":
-        return {"x": head["x"] + 1, "y": head["y"]}
-    elif move == "up":
-        return {"x": head["x"], "y": head["y"] + 1}
-    elif move == "down":
-        return {"x": head["x"], "y": head["y"] - 1}
+    def _pop_tails(self):
+        for snake in self.board.snakes:
+            if snake.body[-1] != snake.body[-2]:
+                snake.body.pop()
 
+    def choose(self) -> Move:
+        # remove tails from snakes so we don't have to avoid them
+        self._pop_tails()
 
-def food_is_mine(snakes, food_coords, me):
-    return me == min(snakes, key=lambda s: distance(s["head"], food_coords))
+        # avoid moving off the board
+        self._avoid_edges()
+
+        # avoid collisions with any snake's body (including our own!)
+        for snake in self.board.snakes:
+            self._avoid_positions(snake.body)
+
+        # get a list of foods that belong to us (i.e. that we are the closest snake to)
+        # and that is safe
+        food_we_own = list(filter(self._own, filter(self._safe, self.board.foods)))
+
+        if len(food_we_own) > 0:
+            # choose the food that is closest to us & that belongs to us
+            closest_food = min(food_we_own, key=self.me.dist)
+
+            """
+            choose move by ordered preference:
+            1. minimize risk
+            2. minimize distance to closest_food after apply the move
+            i.e. first minimize #1, if there are any ties for lowest, use minimum for #2
+            """
+            move = min(self.possible_moves, key=lambda move: (
+                self._risk(move),
+                self._hazardous(move),
+                self.head.apply(move).dist(closest_food),
+                -self._floodfill(move),
+            ))
+        else:
+            # choose move by lowest risk
+            move = min(self.possible_moves, key=lambda move: (
+                self._risk(move),
+                self._hazardous(move),
+                -self._floodfill(move),
+            ))
+        return move
 
 
 def choose_move(data: dict) -> str:
     start = datetime.datetime.now()
-    #print(
-    #    f"~~~ Turn: {data['turn']}  Game Mode: {data['game']['ruleset']['name']} ~~~"
-    #)
-    me = data["you"]
-    my_head = data["you"]["head"]
-    # my_length = data["you"]["length"]
-    my_head = data["you"]["head"]
-    # my_body = data["you"]["body"]
-    width = data["board"]["width"]
-    height = data["board"]["height"]
-    snakes = data["board"]["snakes"]
-    foods = data["board"]["food"]
-    # print(f"{width=} {height=}")
-    # print(f"My battlesnake: {data['you']}")
-    # print(f"My Battlesnakes head this turn is: {my_head}")
-    # print(f"My Battlesnakes body this turn is: {my_body}")
-    #print(f"My Battlesnakes health this turn is: {data['you']['health']}")
-    # print(len(data['board']['snakes']), "snakes")
 
-    possible_moves = ["up", "down", "left", "right"]
-
-    # stay on the board!
-    avoid_edges(my_head, width, height, possible_moves)
-
-    for snake in snakes:
-        # avoid collisions with any snake's body
-        avoid_body(my_head, snake["body"], possible_moves)
-
-        # avoid possible collisions with any snake's head
-        # avoid_head(my_head, my_length, snake["head"], snake["length"], possible_moves)
-
-    # get a list of foods that belong to us (i.e. that we are the closest snake to)
-    my_foods = list(filter(lambda f: food_is_mine(snakes, f, data["you"]), foods))
-
-    if len(my_foods) > 0:
-        # choose the food that is closest to us & that belongs to us
-        closest_food = min(my_foods, key=lambda food: distance(food, my_head))
-
-        # choose the move that brings us closest to the `closest_food`
-        move = min(possible_moves, key=lambda move: (risk(move, me, snakes), distance(apply_move(my_head, move), closest_food)))
-    else:
-        move = min(possible_moves, key=lambda move: risk(move, me, snakes))
-
-    # TODO: remove collisions, unless that's our only possible move
-
-    dur = (datetime.datetime.now() - start).total_seconds() * 1000
-
-    print(
-        f"{data['game']['id']} MOVE {data['turn']}: {move} picked from all valid options in {possible_moves} in {dur:.3}ms"
-    )
-
-    return move
+    move = Strategy(data).choose()
+    
+    duration_ms = (datetime.datetime.now() - start).total_seconds() * 1000
+    # print(f"Turn {data['turn']}: {move} in {duration_ms:.3}ms | GID={data['game']['id']}")
+    return move.name.lower()

@@ -26,9 +26,9 @@ def handle_info():
     return {
         "apiversion": "1",
         "author": "Lowmen",
-        "color": "#00FF00",
-        "head": "bonhomme",
-        "tail": "bonhomme",
+        "color": "#FF7518",
+        "head": "happy",
+        "tail": "shiny",
   }
 
 
@@ -67,7 +67,8 @@ def end():
     data = request.get_json()
     ct = datetime.datetime.now()
 
-    print(f"{data['game']['id']} END", ct)
+    print(f"{data['you']['health']} Remaining Health", ct)
+    print(f"{data['game']['id']} END")
     #print(f"{data['board']['snakes']} END")
     return "ok"
 

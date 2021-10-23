@@ -1,11 +1,27 @@
 To do list:
-- force collision with smaller snake
-- don't box ourselves in
-- don't remove last move
-- shortest path instead of manhattan distance
-- refactor
+
+- aggression
+    - force collision with smaller snake
+    - box them in?
+    - apporach: maybe just move toward their head shortest path? switch to this when we have 'enough' food?
+- is there a point where we should stop eating?
+ - the comsole output when there are errors seems to go back severl hours, even though the window has been cleared.  Is there something that needs to eb released or something?
+
 
 Done:
 - switch from random move selection to some kind of weighted selection
 - avoid potential collision with higher health snakes
 - go after food we are closest to
+- deal with hazards
+    - fix bug that while we're in hazards there are no valid moves, so no way out
+- tail options
+    - the place where our tail is a safe move unless the tail is stacked (we ate last turn, stacked same as at game start)
+    - another snake's tail is a safe move unless the tail is stacked
+- don't box ourselves in - floodfill
+- latency?
+
+
+Not at this time:
+- deal with hazards
+    - do we want to get food from hazards?  (this might be good or bad...)
+- shortest path instead of manhattan distance

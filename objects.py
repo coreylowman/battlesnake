@@ -102,3 +102,9 @@ class Board:
         self.foods: List[Position] = [Position.load(p) for p in data["food"]]
         self.hazards: List[Position] = [Position.load(p) for p in data["hazards"]]
         self.snakes: List[Battlesnake] = [Battlesnake(s) for s in data["snakes"]]
+        self.non_hazards: List[Position] = []
+        for x in range(self.width):
+            for y in range(self.height):
+                p = Position(x, y)
+                if p not in self.hazards:
+                    self.non_hazards.append(p)

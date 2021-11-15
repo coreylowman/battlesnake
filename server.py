@@ -9,7 +9,7 @@ import server_logic
 
 
 app = Flask(__name__)
-
+logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
 @app.get("/")
 def handle_info():
@@ -28,7 +28,7 @@ def handle_info():
         "author": "Lowmen",
         "color": "#FF7518",
         "head": "happy",
-        "tail": "shiny",
+        "tail": "offroad",
   }
 
 
@@ -39,8 +39,7 @@ def handle_start():
     request.json contains information about the game that's about to be played.
     """
     data = request.get_json()
-
-    print(f"{data['game']['id']} START")
+    print(f"https://play.battlesnake.com/g/{data['game']['id']}")
     return "ok"
 
 
@@ -68,8 +67,11 @@ def end():
     ct = datetime.datetime.now()
 
     print(f"{data['you']['health']} Remaining Health", ct)
-    print(f"{data['game']['id']} END")
-    #print(f"{data['board']['snakes']} END")
+    if any(s["id"] == data["you"]["id"] for s in data["board"]["snakes"]):
+        result = "WIN"
+    else:
+        result = "LOSS"
+    print(f"{data['game']['id']} END - {result}")
     return "ok"
 
 
